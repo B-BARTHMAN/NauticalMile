@@ -1,0 +1,49 @@
+[gd_scene format=3 uid="uid://bfsw12mpftk62"]
+
+[ext_resource type="Script" uid="uid://bfqxcixpr4phc" path="res://Player/MotionController/MotionController.cs" id="1_4flbx"]
+[ext_resource type="Script" uid="uid://dpvtxq1ovq81s" path="res://Player/CameraController.cs" id="1_hqtel"]
+[ext_resource type="Script" uid="uid://bx6wo6qg4yavl" path="res://Player/MotionController/Grounded/IdleState.cs" id="2_onrkg"]
+[ext_resource type="Script" uid="uid://dq2x0bgsri17g" path="res://Player/MotionController/Grounded/WalkingState.cs" id="3_i3pqv"]
+[ext_resource type="Script" uid="uid://cbku7fi2m2imm" path="res://Player/MotionController/Grounded/JumpChargeState.cs" id="5_2hs0m"]
+[ext_resource type="Script" uid="uid://bpek5ubhvxmov" path="res://Player/MotionController/Airborn/JumpingState.cs" id="6_1jxqw"]
+[ext_resource type="Script" uid="uid://8pgpaxrf4qim" path="res://Player/MotionController/Airborn/FallingState.cs" id="7_1jxqw"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_i3pqv"]
+height = 1.8
+
+[node name="Player" type="CharacterBody3D" unique_id=1251270846]
+
+[node name="Camera" type="Camera3D" parent="." unique_id=242743218 node_paths=PackedStringArray("_player")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 0)
+fov = 120.0
+script = ExtResource("1_hqtel")
+_player = NodePath("..")
+
+[node name="Collision" type="CollisionShape3D" parent="." unique_id=589311626]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+shape = SubResource("CapsuleShape3D_i3pqv")
+
+[node name="MotionController" type="Node" parent="." unique_id=775318290 node_paths=PackedStringArray("Body", "_initialState")]
+script = ExtResource("1_4flbx")
+Body = NodePath("..")
+_initialState = NodePath("Falling")
+
+[node name="Idle" type="Node" parent="MotionController" unique_id=71615009]
+script = ExtResource("2_onrkg")
+
+[node name="Walking" type="Node" parent="MotionController" unique_id=317407778]
+script = ExtResource("3_i3pqv")
+_walkSpeed = 4.76
+_jumpForce = 8.0
+
+[node name="JumpCharge" type="Node" parent="MotionController" unique_id=843940678]
+script = ExtResource("5_2hs0m")
+_maxJump = 14.0
+
+[node name="Jumping" type="Node" parent="MotionController" unique_id=966486219]
+script = ExtResource("6_1jxqw")
+_gravity = 9.81
+
+[node name="Falling" type="Node" parent="MotionController" unique_id=1759834904]
+script = ExtResource("7_1jxqw")
+_gravity = 15.0

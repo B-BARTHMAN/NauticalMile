@@ -1,0 +1,46 @@
+[gd_scene format=3 uid="uid://d275ylmwtfewr"]
+
+[ext_resource type="PackedScene" uid="uid://bfsw12mpftk62" path="res://player.tscn" id="2_0xm2m"]
+[ext_resource type="PackedScene" uid="uid://ctbxpe20cmgmw" path="res://BlockBench/Sailboat/Sailboat.gltf" id="3_1bvp3"]
+[ext_resource type="PackedScene" uid="uid://bf2ns8r4cqaej" path="res://Blender/Island1/Island1.glb" id="3_h2yge"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_0xm2m"]
+transparency = 1
+albedo_color = Color(0, 0.38431373, 0.70980394, 0.8666667)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_xrxqv"]
+material = SubResource("StandardMaterial3D_0xm2m")
+size = Vector2(256, 256)
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_7mycd"]
+sky_top_color = Color(0.3102031, 0.42714006, 0.75879645, 1)
+sky_horizon_color = Color(0.8117466, 0.6184151, 0.2692544, 1)
+sky_curve = 0.072445296
+
+[sub_resource type="Sky" id="Sky_0xm2m"]
+sky_material = SubResource("ProceduralSkyMaterial_7mycd")
+
+[sub_resource type="Environment" id="Environment_srn3l"]
+background_mode = 2
+sky = SubResource("Sky_0xm2m")
+
+[node name="main" type="Node3D" unique_id=1568528781]
+
+[node name="Player" parent="." unique_id=1251270846 instance=ExtResource("2_0xm2m")]
+transform = Transform3D(0.7100147, 0, -0.70418686, 0, 1, 0, 0.70418686, 0, 0.7100147, 13.041755, 8.130693, 2.9545565)
+floor_max_angle = 1.0471976
+
+[node name="Island1" parent="." unique_id=858660511 instance=ExtResource("3_h2yge")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -2, 0)
+
+[node name="Sun" type="DirectionalLight3D" parent="." unique_id=1900736805]
+transform = Transform3D(1, 0, 0, 0, 0.58479154, 0.8111836, 0, -0.8111836, 0.58479154, 0, 0, 0)
+
+[node name="Water" type="MeshInstance3D" parent="." unique_id=492353756]
+mesh = SubResource("PlaneMesh_xrxqv")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=29989405]
+environment = SubResource("Environment_srn3l")
+
+[node name="Boat" parent="." unique_id=530964943 instance=ExtResource("3_1bvp3")]
+transform = Transform3D(1.594, 0, 0, 0, 1.594, 0, 0, 0, 1.594, 42.850163, 0.63182235, -5.470852)
