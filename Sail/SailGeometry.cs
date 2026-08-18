@@ -5,6 +5,7 @@ public class SailGeometry
 {
     public Vector3[] Vertices { get; private set; }
     public int[] Triangles { get; private set; }
+    public (int A, int B)[] Edges { get; private set; }
     public ArrayMesh Mesh { get; private set; }
     public bool[] Fixed { get; private set; }
 
@@ -31,6 +32,8 @@ public class SailGeometry
     {
         List<Vector3> vertices = [];
         List<int> triangles = [];
+        List<(int A, int B)> edges = [];
+
         Fixed = new bool[(_resolution + 1) * (_resolution + 2) / 2];
 
         int[,] vertexIndices = new int[_resolution + 1, _resolution + 1];
@@ -58,6 +61,8 @@ public class SailGeometry
 
                 vertices.Add(vertex);
 
+                // i == 0 -> boom
+                // j == 0 -> mast
                 Fixed[index] = i == 0 || j == 0;
             }
         }
@@ -70,7 +75,6 @@ public class SailGeometry
         {
             for (int j = 0; j < _resolution - i; j++)
             {
-                // First triangle
                 int a = vertexIndices[i, j];
                 int b = vertexIndices[i + 1, j];
                 int c = vertexIndices[i, j + 1];
@@ -79,7 +83,6 @@ public class SailGeometry
                 triangles.Add(b);
                 triangles.Add(c);
 
-                // Second triangle
                 if (i + j < _resolution - 1)
                 {
                     int d = vertexIndices[i + 1, j + 1];
@@ -91,31 +94,51 @@ public class SailGeometry
             }
         }
 
-        // ---------------------------------------------------------
-        // Keep the raw data for the particle simulation.
-        // ---------------------------------------------------------
-
         Vertices = [.. vertices];
         Triangles = [.. triangles];
 
         // ---------------------------------------------------------
-        // Build render mesh.
+        // Unique edges
         // ---------------------------------------------------------
+
+        HashSet<(int, int)> edgeSet = [];
+
+        for (int i = 0; i < Triangles.Length; i += 3)
+        {
+            AddEdge(edgeSet, Triangles[i], Triangles[i + 1]);
+            AddEdge(edgeSet, Triangles[i + 1], Triangles[i + 2]);
+            AddEdge(edgeSet, Triangles[i + 2], Triangles[i]);
+        }
+
+        edges.AddRange(edgeSet);
+
+        Edges = [.. edges];
+
+        // ---------------------------------------------------------
+        // Render mesh
+        // ---------------------------------------------------------
+
         SurfaceTool tool = new();
+
         tool.Begin(Godot.Mesh.PrimitiveType.Triangles);
 
-        for (int i = 0; i < Vertices.Length; i++)
-        {
-            tool.AddVertex(Vertices[i]);
-        }
+        foreach (Vector3 vertex in Vertices)
+            tool.AddVertex(vertex);
 
-        for (int i = 0; i < Triangles.Length; i++)
-        {
-            tool.AddIndex(Triangles[i]);
-        }
+        foreach (int index in Triangles)
+            tool.AddIndex(index);
 
         tool.GenerateNormals();
 
         Mesh = tool.Commit();
+    }
+
+    private static void AddEdge(
+        HashSet<(int, int)> edges,
+        int a,
+        int b)
+    {
+        if (a > b) (a, b) = (b, a);
+        edges.Add((a, b));
     }
 }

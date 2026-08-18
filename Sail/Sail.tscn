@@ -3,17 +3,7 @@
 [ext_resource type="Script" uid="uid://chxv1qj5dsts8" path="res://Sail/Sail.cs" id="1_wxkx0"]
 
 [sub_resource type="Curve" id="Curve_wxkx0"]
-_data = [Vector2(0, 1), 0.0, 0.046240266, 0, 0, Vector2(0.705, 0.6067416), -0.04406256, -0.04406256, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
-point_count = 3
-
-[sub_resource type="Curve" id="Curve_wobfe"]
-_limits = [-1.0, 1.0, 0.0, 3.14]
-_data = [Vector2(0, 0), 0.0, 0.0, 0, 0, Vector2(0.7824036, 1), 0.0, 0.0, 0, 0, Vector2(1.5682691, 0), -1.1575745, -1.1575745, 0, 0, Vector2(2.3679826, -1), 0.0, 0.0, 0, 0, Vector2(3.14, 0), 0.0, 0.0, 0, 0]
-point_count = 5
-
-[sub_resource type="Curve" id="Curve_s3q8m"]
-_limits = [0.0, 1.0, 0.0, 3.14]
-_data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(1.571731, 0), 0.025726512, 0.025726512, 0, 0, Vector2(3.14, 1), 0.0, 0.0, 0, 0]
+_data = [Vector2(0, 1), 0.0, -0.47617862, 0, 0, Vector2(0.8555678, 0.6433915), -1.0587348, -1.0587348, 0, 0, Vector2(1, 0), -0.014225295, 0.0, 0, 0]
 point_count = 3
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_wxkx0"]
@@ -35,21 +25,21 @@ cull_mode = 2
 _surfaces = [{
 "aabb": AABB(0, 0, 0, 4, 6, 1e-05),
 "format": 34359742471,
-"index_count": 147,
-"index_data": PackedByteArray("AAABAAIAAgABAAMAAgADAAQABAADAAUABAAFAAYABgAFAAcABgAHAAgACAAHAAkACAAJAAoACgAJAAsACgALAAwADAALAA0ADAANAA4AAQAPAAMAAwAPABAAAwAQAAUABQAQABEABQARAAcABwARABIABwASAAkACQASABMACQATAAsACwATABQACwAUAA0ADwAVABAAEAAVABYAEAAWABEAEQAWABcAEQAXABIAEgAXABgAEgAYABMAEwAYABkAEwAZABQAFQAaABYAFgAaABsAFgAbABcAFwAbABwAFwAcABgAGAAcAB0AGAAdABkAGgAeABsAGwAeAB8AGwAfABwAHAAfACAAHAAgAB0AHgAhAB8AHwAhACIAHwAiACAAIQAjACIA"),
+"index_count": 75,
+"index_data": PackedByteArray("AAABAAIAAgABAAMAAgADAAQABAADAAUABAAFAAYABgAFAAcABgAHAAgACAAHAAkACAAJAAoAAQALAAMAAwALAAwAAwAMAAUABQAMAA0ABQANAAcABwANAA4ABwAOAAkACwAPAAwADAAPABAADAAQAA0ADQAQABEADQARAA4ADwASABAAEAASABMAEAATABEAEgAUABMA"),
 "primitive": 3,
 "uv_scale": Vector4(0, 0, 0, 0),
-"vertex_count": 36,
-"vertex_data": PackedByteArray("AAAAAAAAAAAAAAAAAAAAALhtWz8AAAAAJUkSPwAAAAAAAAAAJUkSPypgUz8AAAAAJUmSPwAAAAAAAAAAJUmSPygWPj8AAAAAt23bPwAAAAAAAAAAt23bP/gwJD8AAAAAJUkSQAAAAAAAAAAAJUkSQNdRDj8AAAAAbts2QAAAAAAAAAAAbts2QF2TBD8AAAAAt21bQAAAAAAAAAAAt21bQEJUfD4AAAAAAACAQAAAAAAAAAAAAAAAALht2z8AAAAAJUkSPypg0z8AAAAAJUmSPygWvj8AAAAAt23bP/gwpD8AAAAAJUkSQNdRjj8AAAAAbts2QF2ThD8AAAAAAAAAAEmSJEAAAAAAJUkSPx6IHkAAAAAAJUmSP52QDkAAAAAAt23bP3NJ9j8AAAAAJUkSQMJ61T8AAAAAAAAAALhtW0AAAAAAJUkSPypgU0AAAAAAJUmSPygWPkAAAAAAt23bP/gwJEAAAAAAAAAAAJIkiUAAAAAAJUkSPxkchEAAAAAAJUmSP7CbbUAAAAAAAAAAAEmSpEAAAAAAJUkSPx6InkAAAAAAAAAAAAAAwEAAAAAA/3//f/9/AID/f/9//38AgP9//3//fwCA/3//f/9/AID/f/9//38AgP9//3//fwCA/3//f/9/AID/f/9//38AgP9//3//fwCA/3//f/9/AID/f/9//38AgP9//3//fwCA/3//f/9/AID/f/9//38AgP9//3//fwCA/3//f/9/AID/f/9//38AgP9//3//fwCA/3//f/9/AID/f/9//38AgP9//3//fwCA/3//f/9/AID/f/9//38AgP9//3//fwCA/3//f/9/AID/f/9//38AgP9//3//fwCA/3//f/9/AID/f/9//38AgP9//3//fwCA/3//f/9/AID/f/9//38AgP9//3//fwCA/3//f/9/AID/f/9//38AgP9//3//fwCA")
+"vertex_count": 21,
+"vertex_data": PackedByteArray("AAAAAAAAAAAAAAAAAAAAAJqZmT8AAAAAzcxMPwAAAAAAAAAAzcxMPwBCjz8AAAAAzczMPwAAAAAAAAAAzczMP0PGiD8AAAAAmpkZQAAAAAAAAAAAmpkZQE8tfj8AAAAAzcxMQAAAAAAAAAAAzcxMQPBGVj8AAAAAAACAQAAAAAAAAAAAAAAAAJqZGUAAAAAAzcxMPwBCD0AAAAAAzczMP0PGCEAAAAAAmpkZQE8t/j8AAAAAAAAAAGdmZkAAAAAAzcxMP//iVkAAAAAAzczMP2QpTUAAAAAAAAAAAJqZmUAAAAAAzcxMPwBCj0AAAAAAAAAAAAAAwEAAAAAA/3//f/9/AID/f/9//38AgP9//3//fwCA/3//f/9/AID/f/9//38AgP9//3//fwCA/3//f/9/AID/f/9//38AgP9//3//fwCA/3//f/9/AID/f/9//38AgP9//3//fwCA/3//f/9/AID/f/9//38AgP9//3//fwCA/3//f/9/AID/f/9//38AgP9//3//fwCA/3//f/9/AID/f/9//38AgP9//3//fwCA")
 }]
 
 [node name="Sail" type="Node3D" unique_id=1979707708]
 script = ExtResource("1_wxkx0")
-Resolution = 7
+Resolution = 5
 Curve = SubResource("Curve_wxkx0")
-LiftCurve = SubResource("Curve_wobfe")
-DragCurve = SubResource("Curve_s3q8m")
-Wind = Vector3(-2.77, 0, -2.885)
+MassPerArea = 6.0
+Stiffness = 1000000.0
+Wind = Vector3(0.38, 0, 21.79)
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=481228640]
 environment = SubResource("Environment_f8ul2")
@@ -63,4 +53,4 @@ material_override = SubResource("StandardMaterial3D_f8ul2")
 mesh = SubResource("ArrayMesh_wxkx0")
 
 [node name="Camera3D" type="Camera3D" parent="." unique_id=600676045]
-transform = Transform3D(0.86492574, 0, 0.50189984, -0.044390664, 0.99608105, 0.07649858, -0.49993291, -0.08844526, 0.86153615, 4.9003177, 3.1497836, 3.8735025)
+transform = Transform3D(0.93661404, 0.014856973, 0.35004786, -0.04439066, 0.99608105, 0.07649858, -0.34753948, -0.0871885, 0.933603, 3.8743315, 3.1497836, 4.1338034)

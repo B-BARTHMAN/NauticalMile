@@ -21,13 +21,7 @@ public partial class Sail : Node3D
 
     [Export] public float Stiffness { get; set; } = 1.0f;
 
-    [Export] public float Damping { get; set; } = 10.0f;
-
     [Export] public float AirDensity { get; set; } = 1.225f;
-
-    [Export] public Curve LiftCurve { get; set; }
-
-    [Export] public Curve DragCurve { get; set; }
 
     [Export] public Vector3 Wind { get; set; } = new(10, 0, 0);
 
@@ -53,22 +47,6 @@ public partial class Sail : Node3D
         Regenerate();
     }
 
-
-    // public override void _Process(double delta)
-    // {
-    //     if (!Engine.IsEditorHint()) return;
-
-    //     if (_meshInstance == null) return;
-
-    //     if (Mast != _lastMast ||
-    //         Boom != _lastBoom ||
-    //         Resolution != _lastResolution)
-    //     {
-    //         Regenerate();
-    //     }
-    // }
-
-
     public override void _PhysicsProcess(double delta)
     {
         if (Engine.IsEditorHint()) return;
@@ -90,7 +68,12 @@ public partial class Sail : Node3D
         // ---------------------------------------------
         // Create initial sail.
         // ---------------------------------------------
-        _geometry = new SailGeometry(Resolution, Mast, Boom, Curve);
+        _geometry = new SailGeometry(
+            Resolution,
+            Mast,
+            Boom,
+            Curve
+        );
 
         // Show initial geometry.
         _meshInstance.Mesh = _geometry.Mesh;
@@ -98,19 +81,16 @@ public partial class Sail : Node3D
         // ---------------------------------------------
         // Create physics from initial geometry.
         // ---------------------------------------------
-
         if (!Engine.IsEditorHint())
         {
             _physics = new SailPhysics(
                 _geometry.Vertices,
                 _geometry.Triangles,
+                _geometry.Edges,
                 _geometry.Fixed,
                 MassPerArea,
                 Stiffness,
-                Damping,
-                AirDensity,
-                LiftCurve,
-                DragCurve
+                AirDensity
             );
         }
     }
@@ -123,16 +103,10 @@ public partial class Sail : Node3D
         tool.Begin(Mesh.PrimitiveType.Triangles);
 
         // Current physics positions.
-        foreach (Vector3 position in _physics.Positions)
-        {
-            tool.AddVertex(position);
-        }
+        foreach (Vector3 position in _physics.Positions) tool.AddVertex(position);
 
         // Original triangle topology.
-        foreach (int index in _geometry.Triangles)
-        {
-            tool.AddIndex(index);
-        }
+        foreach (int index in _geometry.Triangles) tool.AddIndex(index);
 
         // Recalculate normals from the new positions.
         tool.GenerateNormals();

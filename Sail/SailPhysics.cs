@@ -1,84 +1,100 @@
 using Godot;
 using System;
-using System.Collections.Generic;
-using System.Diagnostics;
 
 public class SailPhysics
 {
-    private struct Edge(int a, int b, float restLength)
+    private struct EdgeConstraint
     {
-        public int A = a;
-        public int B = b;
-        public float RestLength = restLength;
+        public int A;
+        public int B;
+
+        public float RestLength;
+        public float Compliance;
+
+        public float Lambda;
     }
 
     private readonly Vector3[] _restPositions;
     private readonly Vector3[] _forces;
-    private readonly float[] _masses;
+    private readonly float[] _inverseMasses;
+
     private readonly bool[] _fixed;
 
-    private readonly int[] _triangles;
-    private readonly List<Edge> _edges = [];
+    private readonly EdgeConstraint[] _edges;
 
-    private readonly float _massPerArea;
+    private readonly int[] _triangles;
+
     private readonly float _stiffness;
-    private readonly float _damping;
+    private readonly float _massPerArea;
     private readonly float _airDensity;
 
-    private readonly Curve _liftCurve;
-    private readonly Curve _dragCurve;
-
-    // private readonly Vector3 _boomDirection;
-
-    public Vector3[] Positions { get; }
-    public Vector3[] Velocities { get; }
-
-    public Vector3 MastForce { get; private set; }
-    public Vector3 BoomForce { get; private set; }
+    private readonly int _iterations;
 
     public Vector3 Wind { get; set; }
 
+    /// <summary>
+    /// Total force that the sail applies to the mast/boom.
+    /// Apply this to the ship.
+    /// </summary>
+    // public Vector3 ForceOnShip { get; private set; }
+
+
+    public Vector3[] Positions { get; }
+
+    public Vector3[] Velocities { get; }
+
+    public float[] Masses { get; }
+
+
     public SailPhysics(
-    Vector3[] restPositions,
-    int[] triangles,
-    bool[] fixedVertices,
-    float massPerArea,
-    float stiffness,
-    float damping,
-    float airDensity,
-    Curve liftCurve,
-    Curve dragCurve)
+        Vector3[] positions,
+        int[] triangles,
+        (int A, int B)[] edges,
+        bool[] fixedVertices,
+        float massPerArea,
+        float stiffness,
+        float airDensity,
+        int iterations = 10)
     {
-        _restPositions = (Vector3[])restPositions.Clone();
-        Positions = (Vector3[])restPositions.Clone();
+        _restPositions = (Vector3[])positions.Clone();
 
-        _triangles = (int[])triangles.Clone();
+        Positions = (Vector3[])positions.Clone();
+        Velocities = new Vector3[positions.Length];
+        _forces = new Vector3[positions.Length];
 
-        Velocities = new Vector3[restPositions.Length];
-        _forces = new Vector3[restPositions.Length];
-        _masses = new float[restPositions.Length];
+        Masses = new float[positions.Length];
+        _inverseMasses = new float[positions.Length];
 
         _fixed = (bool[])fixedVertices.Clone();
 
+        _triangles = triangles;
+
         _massPerArea = massPerArea;
         _stiffness = stiffness;
-        _damping = damping;
         _airDensity = airDensity;
 
-        _liftCurve = liftCurve;
-        _dragCurve = dragCurve;
+        _iterations = Math.Max(1, iterations);
+
+        // -----------------------------------------------------
+        // Calculate vertex masses from triangle areas.
+        // -----------------------------------------------------
 
         CalculateMasses();
-        BuildEdges();
+
+        // -----------------------------------------------------
+        // Calculate edge rest lengths and compliance.
+        // -----------------------------------------------------
+
+        _edges = new EdgeConstraint[edges.Length];
+
+        CalculateEdges(edges);
+
+        Wind = Vector3.Zero;
     }
 
-    // ---------------------------------------------------------
-    // Initialization
-    // ---------------------------------------------------------
+
     private void CalculateMasses()
     {
-        Array.Fill(_masses, 0.0f);
-
         for (int i = 0; i < _triangles.Length; i += 3)
         {
             int a = _triangles[i];
@@ -88,52 +104,228 @@ public class SailPhysics
             Vector3 ab = _restPositions[b] - _restPositions[a];
             Vector3 ac = _restPositions[c] - _restPositions[a];
 
-            float area = ab.Cross(ac).Length() * 0.5f;
+            float area = 0.5f * ab.Cross(ac).Length();
 
             float triangleMass = area * _massPerArea;
             float vertexMass = triangleMass / 3.0f;
 
-            _masses[a] += vertexMass;
-            _masses[b] += vertexMass;
-            _masses[c] += vertexMass;
+            Masses[a] += vertexMass;
+            Masses[b] += vertexMass;
+            Masses[c] += vertexMass;
+        }
+
+        for (int i = 0; i < Masses.Length; i++)
+        {
+            // Fixed vertices still need their physical mass.
+            // It is used when calculating the reaction force.
+            _inverseMasses[i] =
+                Masses[i] > 0.0f
+                    ? 1.0f / Masses[i]
+                    : 0.0f;
         }
     }
 
-    private void BuildEdges()
+    private void CalculateEdges((int A, int B)[] edges) // THIS LOOKS SUS
     {
-        HashSet<(int, int)> uniqueEdges = [];
+        for (int i = 0; i < edges.Length; i++)
+        {
+            int a = edges[i].A;
+            int b = edges[i].B;
+
+            float restLength = _restPositions[a].DistanceTo(_restPositions[b]);
+
+            float adjacentArea = GetAdjacentTriangleArea(a, b);
+
+            /*
+             * Stiffness is a 2D membrane stiffness [N/m].
+             *
+             * Converting it to an edge spring stiffness:
+             *
+             *     k = Stiffness * A / L²
+             *
+             * A/L² is dimensionless, so k remains N/m.
+             *
+             * This makes the edge stiffness depend on the
+             * local mesh geometry rather than simply using the
+             * same spring constant for every edge.
+             */
+            float edgeStiffness = 0.0f;
+
+            if (restLength > 0.000001f)
+            {
+                edgeStiffness =
+                    _stiffness *
+                    adjacentArea /
+                    (restLength * restLength);
+            }
+
+            float compliance =
+                edgeStiffness > 0.0f
+                    ? 1.0f / edgeStiffness
+                    : 0.0f;
+
+            _edges[i] = new EdgeConstraint
+            {
+                A = a,
+                B = b,
+                RestLength = restLength,
+                Compliance = compliance,
+                Lambda = 0.0f
+            };
+        }
+    }
+
+
+    private float GetAdjacentTriangleArea(int a, int b) // THIS LOOKS SUS
+    {
+        float area = 0.0f;
 
         for (int i = 0; i < _triangles.Length; i += 3)
         {
-            int[] v = [_triangles[i], _triangles[i + 1], _triangles[i + 2]];
+            int t0 = _triangles[i];
+            int t1 = _triangles[i + 1];
+            int t2 = _triangles[i + 2];
 
-            foreach (var (a, b) in new[] { (v[0], v[1]), (v[1], v[2]), (v[2], v[0]) })
-            {
-                var edge = (Math.Min(a, b), Math.Max(a, b));
+            bool containsA =
+                t0 == a ||
+                t1 == a ||
+                t2 == a;
 
-                if (uniqueEdges.Add(edge))
-                    _edges.Add(new Edge(a, b, _restPositions[a].DistanceTo(_restPositions[b])));
-            }
+            bool containsB =
+                t0 == b ||
+                t1 == b ||
+                t2 == b;
+
+            if (!containsA || !containsB) continue;
+
+            Vector3 ab = _restPositions[t1] - _restPositions[t0];
+            Vector3 ac = _restPositions[t2] - _restPositions[t0];
+
+            area += 0.5f * ab.Cross(ac).Length();
         }
+
+        return area;
     }
 
-    // ---------------------------------------------------------
-    // Simulation
-    // ---------------------------------------------------------
+
     public void Simulate(float delta)
     {
-        Array.Fill(_forces, Vector3.Zero);
+        if (delta <= 0.0f) return;
 
-        CalculateAerodynamicForces();
-        CalculateSpringForces();
+        // -----------------------------------------------------
+        // 1. Clear forces.
+        // -----------------------------------------------------
 
-        Integrate(delta);
+        Array.Clear(_forces, 0, _forces.Length);
+
+        // -----------------------------------------------------
+        // 2. Aerodynamics.
+        // -----------------------------------------------------
+
+        ApplyAerodynamicForces();
+
+        // -----------------------------------------------------
+        // 3. Predict positions.
+        // -----------------------------------------------------
+
+        Vector3[] oldPositions = (Vector3[])Positions.Clone();
+
+        for (int i = 0; i < Positions.Length; i++)
+        {
+            // THIS MAY NOT BE NECESSARY
+            if (_fixed[i])
+            {
+                Positions[i] = _restPositions[i];
+                Velocities[i] = Vector3.Zero;
+                continue;
+            }
+
+            Vector3 acceleration = _forces[i] * _inverseMasses[i];
+
+            Velocities[i] += acceleration * delta;
+
+            Positions[i] += Velocities[i] * delta;
+        }
+
+        // -----------------------------------------------------
+        // 4. XPBD.
+        // -----------------------------------------------------
+
+        // XPBD lambdas are per time step, so reset them here.
+        for (int i = 0; i < _edges.Length; i++)
+        {
+            _edges[i].Lambda = 0;
+            // EdgeConstraint edge = _edges[i];
+            // edge.Lambda = 0.0f;
+            // _edges[i] = edge;
+        }
+
+        Vector3[] fixedLambdas = new Vector3[Positions.Length];
+
+        for (int iteration = 0; iteration < _iterations; iteration++)
+        {
+            // ---------------------------------------------
+            // Edge constraints
+            // ---------------------------------------------
+
+            for (int i = 0; i < _edges.Length; i++)
+            {
+                SolveEdgeConstraint(ref _edges[i], delta);
+            }
+
+            // ---------------------------------------------
+            // Fixed constraints
+            // ---------------------------------------------
+
+            for (int i = 0; i < Positions.Length; i++)
+            {
+                if (!_fixed[i]) continue;
+
+                Vector3 lambda = SolveFixedConstraint(i);
+
+                fixedLambdas[i] += lambda;
+            }
+        }
+
+        // -----------------------------------------------------
+        // 5. Calculate new velocities.
+        // -----------------------------------------------------
+
+        for (int i = 0; i < Positions.Length; i++)
+        {
+            Velocities[i] = (Positions[i] - oldPositions[i]) / delta;
+        }
+
+        // Fixed particles have zero velocity.
+        for (int i = 0; i < Positions.Length; i++) // THIS MAY NOT BE NECESSARY
+        {
+            if (_fixed[i]) Velocities[i] = Vector3.Zero;
+        }
+
+        // -----------------------------------------------------
+        // 6. Calculate force transferred to ship.
+        // -----------------------------------------------------
+
+        // ForceOnShip = Vector3.Zero;
+
+        // for (int i = 0; i < _positions.Length; i++)
+        // {
+        //     if (!_fixed[i]) continue;
+
+        //     /*
+        //      * Lambda is an impulse-like quantity.
+        //      *
+        //      * lambda / dt² gives the constraint force on
+        //      * the sail.
+        //      *
+        //      * The ship receives the opposite force.
+        //      */
+        //     ForceOnShip -= fixedLambdas[i] / (delta * delta);
+        // }
     }
 
-    // ---------------------------------------------------------
-    // Aerodynamics
-    // ---------------------------------------------------------
-    private void CalculateAerodynamicForces()
+
+    private void ApplyAerodynamicForces()
     {
         for (int i = 0; i < _triangles.Length; i += 3)
         {
@@ -141,118 +333,160 @@ public class SailPhysics
             int b = _triangles[i + 1];
             int c = _triangles[i + 2];
 
-            Vector3 pa = Positions[a];
-            Vector3 pb = Positions[b];
-            Vector3 pc = Positions[c];
+            Vector3 p0 = Positions[a];
+            Vector3 p1 = Positions[b];
+            Vector3 p2 = Positions[c];
 
-            Vector3 cross = (pb - pa).Cross(pc - pa);
+            Vector3 cross = (p1 - p0).Cross(p2 - p0);
+
             float doubleArea = cross.Length();
 
             if (doubleArea < 0.000001f) continue;
 
             float area = doubleArea * 0.5f;
+
             Vector3 normal = cross / doubleArea;
 
-            Vector3 relativeWind = Wind - ((Velocities[a] + Velocities[b] + Velocities[c]) / 3f);
+            // Average velocity of the triangle.
+            Vector3 triangleVelocity =
+                (Velocities[a] +
+                 Velocities[b] +
+                 Velocities[c]) / 3.0f;
 
-            float speed = relativeWind.Length();
+            /*
+             * Wind relative to the moving triangle.
+             */
+            Vector3 relativeWind = Wind - triangleVelocity;
 
-            if (speed < 0.001f) continue;
+            /*
+             * Only the component normal to the sail
+             * produces aerodynamic pressure in this simple
+             * drag-only model.
+             */
+            float normalSpeed = relativeWind.Dot(normal);
 
-            Vector3 windDirection = relativeWind / speed;
+            /*
+             * Dynamic pressure:
+             *
+             *     q = 0.5 * rho * v²
+             *
+             * Keep the sign of normalSpeed so that the force
+             * automatically points in the correct direction.
+             */
+            Vector3 force =
+                0.5f *
+                _airDensity *
+                Mathf.Abs(normalSpeed) *
+                normalSpeed *
+                area *
+                normal;
 
-            // Angle between the sail normal and incoming wind.
-            float windAngle = normal.AngleTo(windDirection);
+            // Distribute triangle force equally.
+            Vector3 vertexForce = force / 3.0f;
 
-            float liftCoefficient = _liftCurve?.SampleBaked(windAngle) ?? 0f;
-
-            float dragCoefficient = _dragCurve?.SampleBaked(windAngle) ?? 0f;
-
-            float dynamicPressure = 0.5f * _airDensity * speed * speed;
-
-            Vector3 dragForce = windDirection * dynamicPressure * area * dragCoefficient;
-
-            Vector3 liftDirection = normal - (windDirection * normal.Dot(windDirection));
-
-            Vector3 liftForce = liftDirection.LengthSquared() > 0.000001f
-                ? liftDirection.Normalized() * dynamicPressure * area * liftCoefficient
-                : Vector3.Zero;
-
-            Vector3 vertexForce = (liftForce + dragForce) / 3f;
-
-            AddForce(a, vertexForce);
-            AddForce(b, vertexForce);
-            AddForce(c, vertexForce);
+            _forces[a] += vertexForce;
+            _forces[b] += vertexForce;
+            _forces[c] += vertexForce;
         }
     }
 
-    // ---------------------------------------------------------
-    // Springs
-    // ---------------------------------------------------------
-    private void CalculateSpringForces()
+
+    private void SolveEdgeConstraint(ref EdgeConstraint edge, float delta)
     {
-        foreach (Edge edge in _edges)
-        {
-            Vector3 delta = Positions[edge.B] - Positions[edge.A];
+        int a = edge.A;
+        int b = edge.B;
 
-            float length = delta.Length();
+        Vector3 difference = Positions[b] - Positions[a];
 
-            Vector3 direction = delta / length;
+        float length = difference.Length();
 
-            // Hooke's law:
-            //
-            // F = (L - L0) * k
+        if (length < 0.000001f) return; // MAY NOT BE NECESSARY
 
-            float extension = length - edge.RestLength;
+        Vector3 direction = difference / length;
 
-            float springStiffness = _stiffness / edge.RestLength;
-            Vector3 force = direction * extension * springStiffness;
+        /*
+         * C(x) = currentLength - restLength
+         */
+        float constraint = length - edge.RestLength;
 
-            AddForce(edge.A, force);
-            AddForce(edge.B, -force);
-        }
+        /*
+         * Gradients:
+         *
+         * dC/dxa = -n
+         * dC/dxb = +n
+         */
+        Vector3 gradientA = -direction; // MAYBE SIGN IS WRONG
+        Vector3 gradientB = direction; // MAYBE SIGN IS WRONG
+
+        float weight = (_inverseMasses[a] * gradientA.LengthSquared()) + (_inverseMasses[b] * gradientB.LengthSquared());
+
+        /*
+         * XPBD:
+         *
+         * alphaHat = alpha / dt²
+         */
+        float alpha = edge.Compliance / (delta * delta);
+
+        float denominator = weight + alpha;
+
+        if (denominator <= 0.0f) return; // MAY NOT BE NECESSARY
+
+        float deltaLambda =
+            (-constraint - (alpha * edge.Lambda)) /
+            denominator;
+
+        edge.Lambda += deltaLambda;
+
+        /*
+         * x += inverseMass * gradient * deltaLambda
+         */
+        Positions[a] +=
+            _inverseMasses[a] *
+            gradientA *
+            deltaLambda;
+
+        Positions[b] +=
+            _inverseMasses[b] *
+            gradientB *
+            deltaLambda;
     }
 
-    // ---------------------------------------------------------
-    // Integration
-    // ---------------------------------------------------------
-    private void Integrate(float delta)
+
+    private Vector3 SolveFixedConstraint(int index)
     {
-            var s = Vector3.Zero;
-        for (int i = 0; i < Positions.Length; i++)
+        /*
+         * C(x) = x - xRest
+         *
+         * Gradient is simply the identity.
+         */
+        Vector3 constraint = Positions[index] - _restPositions[index];
+
+        float inverseMass = _inverseMasses[index];
+
+        /*
+         * Fixed constraints have zero compliance.
+         */
+        float denominator = inverseMass;
+
+        if (denominator <= 0.0f) // MAY NOT BE NECESSARY
         {
-            if (_fixed[i])
-            {
-                Positions[i] = _restPositions[i];
-                Velocities[i] = Vector3.Zero;
-                s += _forces[i];
-                continue;
-            }
+            Positions[index] = _restPositions[index];
 
-            if (_masses[i] <= 0.000001f) continue;
-
-            Vector3 acceleration = _forces[i] / _masses[i];
-
-            Velocities[i] += acceleration * delta;
-
-            // Simple velocity damping.
-            Velocities[i] *= Mathf.Exp(-_damping * delta);
-
-            Positions[i] += Velocities[i] * delta;
-        }
-        Debug.WriteLine(s);
-    }
-
-    private void AddForce(int vertex, Vector3 force)
-    {
-        if (_fixed[vertex])
-        {
-            // We don't apply the force to the fixed vertex.
-            // Instead, this force contributes to the reaction
-            // force that will eventually be sent to the mast/boom.
-            //return;adddddadadadadadadasdadasdadadasdadasdasdasdasdasdasdasdasdasdasd
+            return Vector3.Zero;
         }
 
-        _forces[vertex] += force;
+        /*
+         * Vector-valued constraint.
+         *
+         * lambda = -C / w
+         */
+        Vector3 lambda = -constraint / denominator;
+
+        /*
+         * Position correction.
+         */
+        Positions[index] += inverseMass * lambda;
+
+        return lambda;
     }
 }
